@@ -2,29 +2,45 @@ const db = require('../config/db');
 const orderModel = require('../models/order.model');
 
 const processNewOrder = async (userId, items, paymentMethod) => {
-    const connection = await db.getConnection(); 
-    
+    const connection = await db.getConnection();
+
     try {
-        await connection.beginTransaction(); 
+        await connection.beginTransaction();
 
         let totalPrice = 0;
         const processedItems = [];
 
         // 1. Validasi Menu & Hitung Harga
         for (const item of items) {
-            const menu = await orderModel.getMenuPrice(item.menu_id, connection);
-            if (!menu) {
-                throw new Error(`Menu dengan ID ${item.menu_id} tidak ditemukan atau sedang tidak tersedia.`);
+            // Pengaman: support baik menu_id maupun id biasa
+            const menuId = item.menu_id || item.id;
+
+            // Pengaman: support 'quantity'  maupun 'qty'
+            const itemQty = parseInt(item.quantity || item.qty || 0);
+
+            if (itemQty <= 0) {
+                throw new Error(`Jumlah pesanan (quantity) untuk menu ID ${menuId} tidak valid.`);
             }
-            
-            const subtotal = menu.price * item.qty;
+
+            const menu = await orderModel.getMenuPrice(menuId, connection);
+            if (!menu) {
+                throw new Error(`Menu dengan ID ${menuId} tidak ditemukan atau sedang tidak tersedia.`);
+            }
+
+            // Memastikan menu.price diconvert ke angka agar tidak memicu NaN
+            const menuPrice = parseFloat(menu.price);
+            if (isNaN(menuPrice)) {
+                throw new Error(`Harga untuk menu ${menu.name} di database tidak valid.`);
+            }
+
+            const subtotal = menuPrice * itemQty;
             totalPrice += subtotal;
 
             processedItems.push({
-                menu_id: item.menu_id,
+                menu_id: menuId,
                 name: menu.name,
-                qty: item.qty,
-                price: menu.price
+                qty: itemQty,
+                price: menuPrice
             });
         }
 
@@ -50,24 +66,26 @@ const processNewOrder = async (userId, items, paymentMethod) => {
 
             // Cek resep untuk menu ini
             const recipes = await orderModel.getRecipeByMenuId(pItem.menu_id, connection);
-            
+
             for (const recipe of recipes) {
                 // Total bahan yang dibutuhkan = takaran resep x jumlah kopi yang dipesan
-                const requiredQty = recipe.qty * pItem.qty;
+                const requiredQty = parseFloat(recipe.qty) * pItem.qty;
 
                 // Ambil data stok saat ini (dan kunci datanya sementara)
                 const ingredient = await orderModel.getIngredientForUpdate(recipe.ingredient_id, connection);
-                
+
                 if (!ingredient) {
                     throw new Error(`Bahan baku dengan ID ${recipe.ingredient_id} tidak ditemukan.`);
                 }
 
-                if (ingredient.stock < requiredQty) {
-                    throw new Error(`Stok ${ingredient.name} tidak mencukupi! Sisa stok: ${ingredient.stock}, dibutuhkan: ${requiredQty}.`);
+                const currentStock = parseFloat(ingredient.stock);
+
+                if (currentStock < requiredQty) {
+                    throw new Error(`Stok ${ingredient.name} tidak mencukupi! Sisa stok: ${currentStock}, dibutuhkan: ${requiredQty}.`);
                 }
 
                 // Kurangi stok dan simpan
-                const newStock = ingredient.stock - requiredQty;
+                const newStock = currentStock - requiredQty;
                 await orderModel.updateIngredientStock(recipe.ingredient_id, newStock, connection);
 
                 // Catat di log bahwa stok keluar karena order ini
@@ -76,20 +94,20 @@ const processNewOrder = async (userId, items, paymentMethod) => {
             }
         }
 
-        await connection.commit(); 
-        
-        return { 
-            orderId, 
-            totalPrice, 
+        await connection.commit();
+
+        return {
+            orderId,
+            totalPrice,
             paymentStatus,
             items: processedItems
         };
 
     } catch (error) {
-        await connection.rollback(); 
-        throw error; // Lempar pesan error ke controller (misal: "Stok tidak mencukupi")
+        await connection.rollback();
+        throw error;
     } finally {
-        connection.release(); 
+        connection.release();
     }
 };
 

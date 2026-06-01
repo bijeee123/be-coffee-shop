@@ -1,10 +1,10 @@
 const db = require('../config/db');
 
 const createMenu = async (menuData) => {
-    const { name, price, category, image, is_available } = menuData;
+    const { name, price, description, is_available, image } = menuData;
     const [result] = await db.query(
-        'INSERT INTO menus (name, price, category, image, is_available) VALUES (?, ?, ?, ?, ?)',
-        [name, price, category, image, is_available !== undefined ? is_available : true]
+        'INSERT INTO menus (name, price, description, is_available, image) VALUES (?, ?, ?, ?, ?)',
+        [name, price, description, is_available, image]
     );
     return result.insertId;
 };

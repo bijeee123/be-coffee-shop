@@ -3,19 +3,21 @@ const orderModel = require('../models/order.model')
 
 const createOrder = async (req, res) => {
     try {
-        const { items, paymentMethod } = req.body;
+        // DIUBAH: Menggunakan payment_method sesuai yang dikirim dari Postman
+        const { items, payment_method } = req.body;
         const userId = req.user.id; // Didapat dari verifyToken middleware
 
         if (!items || !Array.isArray(items) || items.length === 0) {
             return res.status(400).json({ message: 'Item pesanan tidak boleh kosong.' });
         }
 
-        if (!paymentMethod) {
+        // DIUBAH: Validasi menggunakan payment_method
+        if (!payment_method) {
             return res.status(400).json({ message: 'Metode pembayaran wajib diisi (cash/qris/edc).' });
         }
 
-        // Jalankan service untuk memproses pesanan
-        const orderResult = await orderService.processNewOrder(userId, items, paymentMethod);
+        // Jalankan service untuk memproses pesanan (oper variabel payment_method)
+        const orderResult = await orderService.processNewOrder(userId, items, payment_method);
 
         res.status(201).json({
             success: true,
@@ -56,7 +58,49 @@ const updateStatus = async (req, res) => {
     }
 };
 
+// Menampilkan pesanan aktif
+const getActive = async (req, res) => {
+    try {
+        const orders = await orderModel.getActiveOrders();
+        res.status(200).json({ success: true, data: orders });
+    } catch (error) {
+        console.error('Error getActive:', error);
+        res.status(500).json({ success: false, message: 'Gagal mengambil data pesanan aktif.' });
+    }
+};
+
+// Menampilkan histori pesanan
+const getHistory = async (req, res) => {
+    try {
+        const orders = await orderModel.getOrderHistory();
+        res.status(200).json({ success: true, data: orders });
+    } catch (error) {
+        console.error('Error getHistory:', error);
+        res.status(500).json({ success: false, message: 'Gagal mengambil histori pesanan.' });
+    }
+};
+
+// Menampilkan detail pesanan beserta item
+const getDetail = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const orderDetail = await orderModel.getOrderDetails(id);
+
+        if (!orderDetail) {
+            return res.status(404).json({ success: false, message: 'Pesanan tidak ditemukan.' });
+        }
+
+        res.status(200).json({ success: true, data: orderDetail });
+    } catch (error) {
+        console.error('Error getDetail:', error);
+        res.status(500).json({ success: false, message: 'Gagal mengambil detail pesanan.' });
+    }
+};
+
 module.exports = {
     createOrder,
-    updateStatus
+    updateStatus,
+    getActive,
+    getHistory,
+    getDetail
 };

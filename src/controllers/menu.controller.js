@@ -1,5 +1,35 @@
 const menuModel = require('../models/menu.model');
 
+const createMenu = async (req, res) => {
+    try {
+        const { name, price, description, is_available } = req.body;
+        
+        // Ambil nama file jika ada gambar yang diupload
+        const image = req.file ? req.file.filename : null;
+
+        if (!name || !price) {
+            return res.status(400).json({ message: 'Nama dan harga menu wajib diisi.' });
+        }
+
+        const menuId = await menuModel.createMenu({
+            name,
+            price,
+            description,
+            is_available: is_available || true,
+            image: image // Simpan nama filenya ke database
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Menu berhasil ditambahkan beserta gambar.',
+            data: { id: menuId, name, price, image }
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ success: false, message: 'Gagal menambahkan menu.' });
+    }
+};
+
 const addMenu = async (req, res) => {
     try {
         const { name, price, category, image, is_available } = req.body;
@@ -48,6 +78,7 @@ const getMenus = async (req, res) => {
 };
 
 module.exports = {
+    createMenu,
     addMenu,
     getMenus
 };
