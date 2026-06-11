@@ -6,11 +6,27 @@ const getMenuPrice = async (menu_id, connection) => {
 };
 
 const createOrder = async (orderData, connection) => {
-    const { user_id, total_price, final_price, payment_status, payment_method } = orderData;
-    const [result] = await connection.query(
-        'INSERT INTO orders (user_id, total_price, final_price, payment_status, payment_method) VALUES (?, ?, ?, ?, ?)',
-        [user_id, total_price, final_price, payment_status, payment_method]
+    // Gunakan connection yang dioper dari service, jika tidak ada baru panggil db config biasa
+    const db = connection || require('../config/db');
+
+    // 1. Ambil data dengan destructuring biar lebih bersih kodenya
+    const { user_id, customer_id, total_price, final_price, payment_status, payment_method } = orderData;
+
+    // 2. Samakan URUTAN KOLOM (total ada 7 kolom)
+    const [result] = await db.query(
+        `INSERT INTO orders (user_id, customer_id, total_price, final_price, payment_status, payment_method, status) 
+            VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
+        [
+            user_id,               
+            customer_id || null,  
+            voucher_id || null,
+            total_price,           
+            final_price,           
+            payment_status,        
+            payment_method         
+        ]
     );
+
     return result.insertId;
 };
 
@@ -22,7 +38,6 @@ const addOrderItem = async (itemData, connection) => {
     );
 };
 
-// --- FUNGSI BARU UNTUK INVENTORY ---
 
 // Mengambil resep dari suatu menu
 const getRecipeByMenuId = async (menu_id, connection) => {
@@ -54,13 +69,26 @@ const updateOrderStatus = async (order_id, status) => {
     return result.affectedRows;
 }
 
-// dapat pesanan yang aktif ( barista )
+// dapat pesanan yang aktif 
 const getActiveOrders = async () => {
     // Mengurutkan dari yang paling lama dibuat (ASC) agar antrean adil
     const [rows] = await db.query(
         'SELECT * FROM orders WHERE status IN ("pending", "processing", "ready") ORDER BY created_at ASC'
     );
     return rows;
+};
+
+// Nambahin point member ketika order selesai
+const addCustomerPoints = async (customerId, pointsToAdd, connection) => {
+    const db = connection || require('../config/db');
+    await db.query(`UPDATE customers SET points = points + ? WHERE id = ?`, [pointsToAdd, customerId]);
+};
+
+// Ngitung total harga nya biar nyesuain sama point yang didapat
+const getOrderById = async (orderId) => {
+    const db = require('../config/db');
+    const [rows] = await db.query(`SELECT * FROM orders WHERE id = ?`, [orderId]);
+    return rows[0];
 };
 
 // dapat histori yang selesai/batal
@@ -101,6 +129,8 @@ module.exports = {
     addStockLog,
     updateOrderStatus,
     getActiveOrders,
+    addCustomerPoints,
+    getOrderById,
     getOrderHistory,
     getOrderDetails
 };

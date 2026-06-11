@@ -6,7 +6,7 @@ const { authorizeRoles } = require('../middlewares/role.middleware');
 
 // Endpoint bahan baku
 router.post('/ingredient', verifyToken, authorizeRoles('admin'), inventoryController.addIngredient);
-router.get('/ingredient', verifyToken, authorizeRoles('admin', 'barista', 'cashier'), inventoryController.getIngredients);
+router.get('/ingredient', verifyToken, authorizeRoles('admin', 'staff'), inventoryController.getIngredients);
 
 // Endpoint resep
 router.post('/recipe', verifyToken, authorizeRoles('admin'), inventoryController.addRecipe);

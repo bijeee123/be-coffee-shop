@@ -31,7 +31,7 @@ const getTopProducts = async () => {
     return rows;
 };
 
-//  Dapatkan Bahan Baku yang Stoknya Menipis 
+// 3. Dapatkan Bahan Baku yang Stoknya Menipis 
 const getLowStockAlert = async () => {
     const [rows] = await db.query(`
         SELECT id, name, stock, unit 
@@ -42,7 +42,7 @@ const getLowStockAlert = async () => {
     return rows;
 };
 
-// Dapatkan Data untuk Grafik Penjualan (7 Hari Terakhir)
+// 4.Dapatkan Data untuk Grafik Penjualan (7 Hari Terakhir)
 const getSalesChartData = async () => {
     const [rows] = await db.query(`
         SELECT 
@@ -56,9 +56,31 @@ const getSalesChartData = async () => {
     return rows;
 };
 
+// 5. Laporan keuntung per produk
+const getProductProfitReport = async () => {
+    const [rows] = await db.query(`
+        SELECT
+        m.name,
+            m.price as selling_price,
+            m.modal as capital_price,
+            (m.price - m.modal) as profit_per_cup,
+            SUM(oi.qty) as total_sold,
+            SUM(oi.qty * m.price) as total_revenue,
+            SUM(oi.qty * (m.price - m.modal)) as total_profit
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.id
+        JOIN menus m ON oi.menu_id = m.id
+        WHERE o.status = 'completed'
+        GROUP BY m.id, m.name, m.price, m.modal
+        ORDER BY total_profit DESC
+    `);
+    return rows;
+}
+
 module.exports = {
     getTodaySummary,
     getTopProducts,
     getLowStockAlert,
-    getSalesChartData
+    getSalesChartData,
+    getProductProfitReport
 };

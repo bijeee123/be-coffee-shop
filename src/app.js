@@ -3,11 +3,17 @@ const path = require('path');
 const cors = require('cors');
 require('dotenv').config();
 
-const authRoutes = require("./routes/auth.routes")
-const menuRoutes = require("./routes/menu.routes")
+const authRoutes = require("./routes/auth.routes");
+const menuRoutes = require("./routes/menu.routes");
 const inventoryRoutes = require('./routes/inventory.routes');
 const orderRoutes = require('./routes/order.routes');
 const reportRoutes = require('./routes/report.routes');
+
+const loyaltyController = require('./controllers/loyalty.controller');
+const voucherController = require('./controllers/voucher.controller'); // <-- 1. Import voucher controller baru
+
+const { verifyToken } = require('./middlewares/auth.middleware');
+const { authorizeRoles } = require('./middlewares/role.middleware');
 
 const app = express();
 
@@ -25,10 +31,14 @@ app.get('/', (req, res) => {
     });
 });
 
-app.use('/api/auth',authRoutes);
-app.use('/api/menu',menuRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/menu', menuRoutes);
 app.use('/api/inventory', inventoryRoutes);
-app.use('/api/order',orderRoutes);
-app.use('/api/report',reportRoutes);
+app.use('/api/order', orderRoutes);
+app.use('/api/report', reportRoutes);
+app.post('/api/loyalty/redeem', loyaltyController.redeemPoints);
+
+// 2. ENDPOINT BARU: Tambah Voucher (Hanya bisa diakses Admin dan Owner)
+app.post('/api/vouchers', verifyToken, authorizeRoles('admin', 'owner'), voucherController.addVoucher);
 
 module.exports = app;

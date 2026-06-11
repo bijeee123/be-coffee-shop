@@ -13,7 +13,7 @@ const register = async (req, res) => {
         }
 
         // Pastikan role valid
-        const validRoles = ['admin', 'cashier', 'barista', 'customer'];
+        const validRoles = ['admin', 'staff', 'customer'];
         if (!validRoles.includes(role)) {
             return res.status(400).json({ message: 'Role tidak valid.' });
         }

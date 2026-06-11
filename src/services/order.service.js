@@ -1,7 +1,9 @@
 const db = require('../config/db');
 const orderModel = require('../models/order.model');
+const voucherModel = require('../models/voucher.model');
 
-const processNewOrder = async (userId, items, paymentMethod) => {
+
+const processNewOrder = async (userId, items, paymentMethod, customerId = null, voucherCode = null) => {
     const connection = await db.getConnection();
 
     try {
@@ -15,7 +17,7 @@ const processNewOrder = async (userId, items, paymentMethod) => {
             // Pengaman: support baik menu_id maupun id biasa
             const menuId = item.menu_id || item.id;
 
-            // Pengaman: support 'quantity'  maupun 'qty'
+            // Pengaman: support 'quantity' maupun 'qty'
             const itemQty = parseInt(item.quantity || item.qty || 0);
 
             if (itemQty <= 0) {
@@ -44,12 +46,39 @@ const processNewOrder = async (userId, items, paymentMethod) => {
             });
         }
 
+        let finalPrice = totalPrice;
+        let voucherId = null;
+
+        if (voucherCode) {
+            // Ambil data voucher yang valid & belum expired dari DB
+            const voucher = await voucherModel.findValidVoucher(voucherCode);
+            if (!voucher) {
+                throw new Error('Voucher tidak valid, sudah kedaluwarsa, atau tidak aktif.');
+            }
+
+            voucherId = voucher.id;
+            const discountValue = parseFloat(voucher.discount);
+
+            // Hitung potongan berdasarkan tipe ('percentage' atau 'fixed')
+            if (voucher.type === 'percentage') {
+                const discountAmount = (totalPrice * discountValue) / 100;
+                finalPrice = totalPrice - discountAmount;
+            } else if (voucher.type === 'fixed') {
+                finalPrice = totalPrice - discountValue;
+            }
+
+            // Pengaman: Biar total pembayaran akhir tidak minus/negatif
+            if (finalPrice < 0) finalPrice = 0;
+        }
+
         // 2. Buat Order Utama
         const paymentStatus = paymentMethod === 'cash' ? 'paid' : 'unpaid';
         const orderId = await orderModel.createOrder({
             user_id: userId,
+            customer_id: customerId,
+            voucher_id: voucherId,
             total_price: totalPrice,
-            final_price: totalPrice,
+            final_price: finalPrice, 
             payment_status: paymentStatus,
             payment_method: paymentMethod
         }, connection);
@@ -99,6 +128,7 @@ const processNewOrder = async (userId, items, paymentMethod) => {
         return {
             orderId,
             totalPrice,
+            finalPrice,
             paymentStatus,
             items: processedItems
         };

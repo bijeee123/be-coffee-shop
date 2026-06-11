@@ -3,11 +3,12 @@ const reportModel = require('../models/report.model');
 const getDashboardData = async (req, res) => {
     try {
         // jalanin aja semua biar cepet
-        const [summary, topProducts, lowStock, chartData] = await Promise.all([
+        const [summary, topProducts, lowStock, chartData, profitReport] = await Promise.all([
             reportModel.getTodaySummary(),
             reportModel.getTopProducts(),
             reportModel.getLowStockAlert(),
-            reportModel.getSalesChartData()
+            reportModel.getSalesChartData(),
+            reportModel.getProductProfitReport()
         ]);
 
         res.status(200).json({
@@ -17,7 +18,8 @@ const getDashboardData = async (req, res) => {
                 summary,
                 chartData,
                 topProducts,
-                lowStock
+                lowStock,
+                profitReport
             }
         });
     } catch (error) {
